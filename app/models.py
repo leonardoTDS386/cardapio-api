@@ -1,3 +1,4 @@
+from datetime import date
 from sqlmodel import SQLModel, Field
 
 # =====================================================================
@@ -77,4 +78,57 @@ class ItemCardapioUpdate(SQLModel):
 
 class ItemCardapioResponse(ItemCardapioBase):
     """Schema retornado pela API nas consultas. Garante a presença do campo 'id'."""
+    id: int
+
+
+# Nova classe cliente base
+
+class ClienteBase(SQLModel):
+    """Campos comuns compartilhados pelo Banco e pela API"""
+    nome: str = Field(
+        min_length=2,
+        max_length = 100,
+        description="Nome do cliente"
+    )
+    cpf: str= Field(
+        min_length=11,
+        max_length = 11,
+        description="CPF do cliente"
+    )
+    telefone: str = Field(
+        max_length= 20,
+        description="Telefone do cliente"
+    )
+    email: str = Field(
+        max_length = 150,
+        description="E-mail do cliente"
+    )
+    endereco: str = Field(
+        max_length = 200,
+        description="Endereço do cliente"
+    )
+    data_nascimento: date = Field(
+        description="Data de nascimento do cliente"
+    )
+
+class Cliente(ClienteBase, table=True):
+    __tablename__ = "clientes"
+
+    id: int | None = Field(default=None, primary_key=True)
+
+class ClienteCreate(ClienteBase):
+    """Schema para validação dos dados de cadastro do cliente (POST)"""
+    pass
+
+class ClienteUpdate(SQLModel):
+    """Schema para atualização dos dados do cliente (PUT/PATCH)."""
+    nome: str | None = None # Opcional para caso queira alterar apenas um
+    cpf: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+    endereco: str | None = None
+    data_nascimento: date | None = None
+
+class ClienteResponse(ClienteBase):
+    """Schema retornado pela API nas consultas. Garante a presença do campo ID"""
     id: int
