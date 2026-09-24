@@ -112,6 +112,7 @@ class ClienteBase(SQLModel):
     )
 
 class Cliente(ClienteBase, table=True):
+    """Modelo ORM que mapeia a tabela 'clientes' no banco de dados"""
     __tablename__ = "clientes"
 
     id: int | None = Field(default=None, primary_key=True)

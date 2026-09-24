@@ -12,7 +12,11 @@ router = APIRouter(prefix='/clientes', tags=["Clientes"])
 # Get /clientes/
 # Lista todos os clientes cadastrados no sistema
 # ======================================================================================
-@router.get('/', response_model=list[ClienteResponse])
+@router.get('/', 
+            response_model=list[ClienteResponse],
+            status_code=status.HTTP_200_OK,
+            summary="Listar clientes cadastrados"
+            )
 def listar_clientes():
     # Abre uma sessão com o banco de dados
     with Session(engine) as session:
@@ -27,7 +31,7 @@ def listar_clientes():
 # Get /clientes/{id}
 # Busca um cliete específico pelo ID
 # ======================================================================================
-@router.get('/{id}', response_model=ClienteResponse)
+@router.get('/{cliente_id}', response_model=ClienteResponse, status_code=status.HTTP_200_OK, summary ="Obter cliente pelo ID")
 def obter_cliente(id: int):
     # Abre uma sessão com o banco
     with Session(engine) as session:
@@ -49,7 +53,11 @@ def obter_cliente(id: int):
 # POST /clientes/
 # Cadastrar um novo cliente
 # ======================================================================================
-@router.post('/', response_model=ClienteResponse, status_code= status.HTTP_201_CREATED)
+@router.post('/',
+             response_model=ClienteResponse,
+             status_code= status.HTTP_201_CREATED,
+             summary="Cadastrar novo cliente"
+             )
 def criar_cliente(cliente: ClienteCreate):
     # Abre uma sessão com o banco.
     with Session(engine) as session:
@@ -73,7 +81,7 @@ def criar_cliente(cliente: ClienteCreate):
 # PUT /clientes/{id}
 # Atualiza os dados de um cliente existente.
 # ======================================================================================
-@router.put('/{id}', response_model=ClienteResponse)
+@router.put('/{cliente_id}', response_model=ClienteResponse)
 def atualizar_cliente(id: int, dados:ClienteUpdate):
     # Abre uma sessão com o banco
     with Session(engine) as session:
@@ -109,7 +117,7 @@ def atualizar_cliente(id: int, dados:ClienteUpdate):
 # Exclui um cliente existente.
 # ======================================================================================
 
-@router.delete('/{id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{cliente_id}', status_code=status.HTTP_204_NO_CONTENT)
 def excluir_cliente(id: int):
     # Abre uma sessão com o banco
     with Session(engine) as session:
