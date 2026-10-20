@@ -4,10 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, select
 
+from datetime import date
 from app.config import settings
 from app.database import engine, criar_tabelas
-from app.models import ItemCardapio
-from app.routers import cardapio, auth, clientes
+from app.models import ItemCardapio, Cliente, Pedido, ItemPedido, StatusPedido
+from app.routers import cardapio, auth, clientes, pedidos
 
 
 # =====================================================================
@@ -69,6 +70,56 @@ async def ciclo_de_vida(app: FastAPI):
             sessao.add_all(dados_iniciais)
             sessao.commit()
 
+        # Seed automático de clientes didáticos para demonstração
+        clientes_existentes = sessao.exec(select(Cliente)).first()
+        if not clientes_existentes:
+            clientes_iniciais = [
+                Cliente(
+                    nome="Maria Silva",
+                    data_nascimento=date(1995, 4, 15),
+                    endereco="Av. Frei Serafim, Centro",
+                    cep="64000-000",
+                    numero="1200",
+                    telefone="86999887766",
+                ),
+                Cliente(
+                    nome="João Santos",
+                    data_nascimento=date(1990, 10, 20),
+                    endereco="Rua Coelho de Resende",
+                    cep="64001-200",
+                    numero="450",
+                    telefone="86988776655",
+                ),
+            ]
+            sessao.add_all(clientes_iniciais)
+            sessao.commit()
+
+        # Seed automático de pedido didático com item para demonstração imediata
+        pedidos_existentes = sessao.exec(select(Pedido)).first()
+        if not pedidos_existentes:
+            primeiro_cliente = sessao.exec(select(Cliente)).first()
+            primeiro_prato = sessao.exec(select(ItemCardapio)).first()
+            if primeiro_cliente and primeiro_prato:
+                pedido_demo = Pedido(
+                    cliente_id=primeiro_cliente.id,
+                    observacoes="Pedido didático de teste inicial para demonstração",
+                    status=StatusPedido.CONFIRMADO,
+                    valor_total=round(primeiro_prato.preco * 2, 2),
+                )
+                sessao.add(pedido_demo)
+                sessao.commit()
+                sessao.refresh(pedido_demo)
+
+                item_demo = ItemPedido(
+                    pedido_id=pedido_demo.id,
+                    item_cardapio_id=primeiro_prato.id,
+                    quantidade=2,
+                    observacao="Sem cebola (item de teste)",
+                    preco_unitario=primeiro_prato.preco,
+                )
+                sessao.add(item_demo)
+                sessao.commit()
+
     yield
 
 
@@ -101,6 +152,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(cardapio.router)
 app.include_router(clientes.router)
+app.include_router(pedidos.router)
 app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
