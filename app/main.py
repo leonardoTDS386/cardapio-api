@@ -11,6 +11,7 @@ from app.models import ItemCardapio, Cliente, Pedido, ItemPedido, StatusPedido
 from app.routers import cardapio, auth, clientes, pedidos
 
 
+
 # =====================================================================
 # CONCEITO DIDÁTICO: Lifespan e Carga Inicial de Dados (Seed)
 # O lifespan gerencia o ciclo de vida da API ao iniciar e desligar.

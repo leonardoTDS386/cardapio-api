@@ -1,8 +1,9 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional  # >>> ALTERAÇÃO: adicionado Optional
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from app.models.item_pedido import ItemPedido
+    from app.models.usuario import Usuario  # >>> ALTERAÇÃO: import do Usuario (só para tipagem)
 
 # =====================================================================
 # CONCEITO DIDÁTICO: SQLModel para Itens do Cardápio
@@ -49,6 +50,16 @@ class ItemCardapio(ItemCardapioBase, table=True):
     __tablename__ = "itens_cardapio"
 
     id: int | None = Field(default=None, primary_key=True)
+
+    # >>> ALTERAÇÃO: coluna com o ID do usuário LOGISTA dono do item (chave estrangeira)
+    usuario_id: int | None = Field(
+        default=None,
+        foreign_key="usuarios.id",
+        description="ID do usuário LOGISTA dono deste item"
+    )
+
+    # >>> ALTERAÇÃO: relacionamento N:1 com Usuario (permite acessar item.usuario)
+    usuario: Optional["Usuario"] = Relationship()
 
     # Relacionamento 1:N com ItensPedido (Sem cascade delete para proteger histórico de vendas)
     itens_pedido: list["ItemPedido"] = Relationship(

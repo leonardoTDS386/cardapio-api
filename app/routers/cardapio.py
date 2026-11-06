@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select, or_
+from typing import Annotated
 
 from app.database import obter_sessao
+# from app.routers.auth import obter_usuario_atual
+from app.dependencies import verificar_perfil, obter_usuario_atual
+from app.models.usuario import Usuario, UsuarioPerfil
 from app.models.item_cardapio import (
     ItemCardapio,
     ItemCardapioCreate,
@@ -27,13 +31,20 @@ router = APIRouter(prefix="/cardapio", tags=["Cardápio"])
             status_code=status.HTTP_200_OK,
             summary="Listar itens do cardápio do restaurante")
 def listar_cardapio(
+    usuario: Annotated[Usuario,
+                       Depends(verificar_perfil([UsuarioPerfil.LOGISTA, UsuarioPerfil.CLIENTE]))],
+    sessao: Session = Depends(obter_sessao),
     categoria: str | None = Query(default=None, description="Filtrar por categoria (ex: Lanches, Bebidas)"),
     disponivel: bool | None = Query(default=None, description="Filtrar por disponibilidade (true ou false)"),
     busca: str | None = Query(default=None, description="Buscar por termo no nome ou descrição"),
     preco_maximo: float | None = Query(default=None, description='Filtrar por no máximo este preço R$.'),
-    sessao: Session = Depends(obter_sessao),
 ):
     query = select(ItemCardapio) # select * from item_cardapio
+
+    # >>> ALTERAÇÃO: LOGISTA lista somente os itens que pertencem a ele
+    # (CLIENTE continua vendo o cardápio completo)
+    if usuario.perfil == UsuarioPerfil.LOGISTA:
+        query = query.where(ItemCardapio.usuario_id == usuario.id)
 
     if preco_maximo:
         query = query.where(ItemCardapio.preco <= preco_maximo)
@@ -68,7 +79,8 @@ def listar_cardapio(
             response_model=ItemCardapioResponse, 
             summary="Obter item por ID")
 def obter_item(
-    item_id: int, 
+    item_id: int,
+    usuario: Annotated[Usuario, Depends(obter_usuario_atual)], 
     sessao: Session = Depends(obter_sessao)
 ):
     item = sessao.get(ItemCardapio, item_id)
@@ -77,7 +89,19 @@ def obter_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Item não localizado com id={item_id}."
         )
-    return item
+    
+    if usuario.perfil == UsuarioPerfil.CLIENTE:
+        return item       
+    elif usuario.perfil == UsuarioPerfil.LOGISTA:
+        # >>> ALTERAÇÃO: compara pelo usuario_id (antes: item.usuario.id, que dava erro 500 em itens sem dono)
+        if item.usuario_id != usuario.id:
+            raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Voce não tem acesso a esse item id={item_id}."
+                        )
+
+        return item
+
 
 
 # =====================================================================
@@ -94,10 +118,12 @@ def obter_item(
     summary="Cadastrar novo item no cardápio"
 )
 def criar_item(
-    dados: ItemCardapioCreate, 
+    dados: ItemCardapioCreate,
+    usuario: Annotated[Usuario, Depends(verificar_perfil([UsuarioPerfil.LOGISTA]))], 
     sessao: Session = Depends(obter_sessao)
 ):
-    novo_item = ItemCardapio.model_validate(dados)
+    # >>> ALTERAÇÃO: vincula o item ao LOGISTA logado (o dono vem do token, nunca do JSON)
+    novo_item = ItemCardapio.model_validate(dados, update={"usuario_id": usuario.id})
     sessao.add(novo_item)
     sessao.commit()
     sessao.refresh(novo_item)
@@ -116,6 +142,7 @@ def criar_item(
 def atualizar_item(
     item_id: int, 
     dados: ItemCardapioUpdate, 
+    usuario: Annotated[Usuario, Depends(verificar_perfil([UsuarioPerfil.LOGISTA]))],  # >>> ALTERAÇÃO: somente LOGISTA
     sessao: Session = Depends(obter_sessao)
 ):
     item_banco = sessao.get(ItemCardapio, item_id)
@@ -123,6 +150,13 @@ def atualizar_item(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Item não localizado com id={item_id}."
+        )
+
+    # >>> ALTERAÇÃO: LOGISTA só pode editar itens que são dele
+    if item_banco.usuario_id != usuario.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Voce não tem acesso a esse item id={item_id}."
         )
 
     # exclude_unset=True ignora campos que o cliente não enviou no payload
@@ -147,6 +181,7 @@ def atualizar_item(
 )
 def alternar_disponibilidade(
     item_id: int, 
+    usuario: Annotated[Usuario, Depends(verificar_perfil([UsuarioPerfil.LOGISTA]))],  # >>> ALTERAÇÃO: somente LOGISTA
     sessao: Session = Depends(obter_sessao)
 ):
     item_banco = sessao.get(ItemCardapio, item_id)
@@ -154,6 +189,13 @@ def alternar_disponibilidade(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Item não localizado com id={item_id}."
+        )
+
+    # >>> ALTERAÇÃO: LOGISTA só pode alterar a disponibilidade dos itens que são dele
+    if item_banco.usuario_id != usuario.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Voce não tem acesso a esse item id={item_id}."
         )
 
     item_banco.disponivel = not item_banco.disponivel
@@ -174,6 +216,7 @@ def alternar_disponibilidade(
 )
 def remover_item(
     item_id: int, 
+    usuario: Annotated[Usuario, Depends(verificar_perfil([UsuarioPerfil.LOGISTA]))],  # >>> ALTERAÇÃO: somente LOGISTA
     sessao: Session = Depends(obter_sessao)
 ):
     item_banco = sessao.get(ItemCardapio, item_id)
@@ -181,6 +224,13 @@ def remover_item(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Item não localizado com id={item_id}."
+        )
+
+    # >>> ALTERAÇÃO: LOGISTA só pode remover itens que são dele
+    if item_banco.usuario_id != usuario.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Voce não tem acesso a esse item id={item_id}."
         )
 
     sessao.delete(item_banco)
